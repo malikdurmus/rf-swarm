@@ -1,48 +1,43 @@
-import time
-
-from matplotlib import pyplot as plt
-from Simulation import Simulation
-
-@staticmethod
-def plot_belief_grid():
-    # Plot the belief grid heatmap
-    plt.imshow(sim.belief_grid, origin='lower')
-    plt.title("Belief After Measurement")
-    # Plot the emitter's true position (yellow star)
-
-    # Use column for x, row for y
-    plt.plot(sim.emitter_pos[0], sim.emitter_pos[1], 'y*', markersize=15, label='Emitter (True)')
-
-    # Consolidate labels in the legend by handling them outside the loop
-    handles, labels = plt.gca().get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys())
-    plt.show()
-    # Plot the drones' positions (red 'X')
-    for drone in sim.drones:
-        # Use column for x, row for y
-        plt.plot(drone.pos[0], drone.pos[1], 'rx', markersize=10, label='Drone')
+from args import Args
+import visualization
+import backend
+from simulation import Simulation
+import tyro
+from args import Args
 
 
-sim = Simulation(size=1000)
+def main():
+    """
+    Main function to set up and run the drone simulation.
+    """
+    # 1. Setup
+    args = tyro.cli(Args)
+    
+    # --- THIS IS THE KEY NEW LINE ---
+    # Set the backend (CPU or GPU) for the entire application
+    backend.set_backend(args.gpu)
+    # --------------------------------
 
-sim.generate_drones(4)
+    sim = Simulation(size=args.size, emitter_pos=args.emitter_pos)
+    sim.generate_drones(args.num_drones)
+    
+    # Use the 'to_numpy' helper for printing, as the array might be on the GPU
+    print(f"Emitter is at: {visualization.to_numpy(sim.emitter_pos)}")
+    for i, drone in enumerate(sim.drones):
+        print(f"Agent{i} starts at: {visualization.to_numpy(drone.pos)}")
 
+    # 2. Initial Visualization
+    visualization.setup_plotting()
+    visualization.plot_simulation_state(sim, title="Initial Belief (Uniform)")
+    input("Press Enter to start the simulation...")
 
-print(f"Emitter is at: {sim.emitter_pos}")
-for i in range(len(sim.drones)):
-    print(f"Agent{i} starts at: {sim.drones[i].pos}")
+    # 3. Main Loop
+    for t in range(1000):
+        sim.run_sim_step()
+        
+        # Periodically update the plot
+        if t % 10 == 0:
+            visualization.plot_simulation_state(sim, title=f"Belief After Measurement (t={t})")
 
-
-# Let's plot the initial, uniform belief
-plt.imshow(sim.belief_grid, origin='lower')
-plt.title("Initial Belief (Uniform)")
-plt.show()
-
-
-for t in range (500):
-
-    sim.run_sim()
-    if t % 5 == 0:
-        time.sleep(0.1)
-        plot_belief_grid()
+if __name__ == "__main__":
+    main()
